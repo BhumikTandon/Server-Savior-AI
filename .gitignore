@@ -1,0 +1,6 @@
+savior_brain/
+checkpoints/
+__pycache__/
+.venv/
+*.txt
+.DS_Store
