@@ -1,50 +1,87 @@
 # Created by Bhumik Tandon
-# File Name: guard_dog.py
-# Purpose: Loads the trained model to monitor logs in real-time and alert on anomalies.
+# Tails a log file and alerts on a novel template or a repeated source.
+
+from __future__ import annotations
 
 import time
-import torch
-import os
-from drain3 import TemplateMiner
-from transformers import AutoTokenizer, AutoModelForMaskedLM
 
-MODEL_PATH = "./savior_brain"
-LOG_FILE = "server_activity_logs.txt"
-THRESHOLD = 6.0
+from transformers import AutoModelForMaskedLM, AutoTokenizer
 
-if not os.path.exists(MODEL_PATH):
-    print("Error: Model not found. Run train_savior.py first!")
-    exit()
+from savior_common import (
+    LOG_FILE,
+    MODEL_DIR,
+    THRESHOLDS_PATH,
+    Decision,
+    PseudoPerplexity,
+    RepeatWindow,
+    build_miner,
+    decide,
+    load_thresholds,
+    parse_timestamp,
+    quiet_loggers,
+)
 
-print("Loading Server-Savior-AI...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-model = AutoModelForMaskedLM.from_pretrained(MODEL_PATH)
-template_miner = TemplateMiner()
 
-def check_log(line):
-    template = template_miner.add_log_message(line.strip())["template_mined"]
-    inputs = tokenizer(template, return_tensors="pt", truncation=True, max_length=64)
-    with torch.no_grad():
-        loss = model(**inputs, labels=inputs["input_ids"]).loss.item()
-    return loss
+def require_training() -> None:
+    if not MODEL_DIR.exists() or not THRESHOLDS_PATH.exists():
+        raise SystemExit("Model not found. Run train_savior.py first.")
 
-def follow(file):
-    file.seek(0, 2)
-    while True:
-        line = file.readline()
-        if not line:
-            time.sleep(0.1)
-            continue
-        yield line
 
-print(f"Server-Savior is watching {LOG_FILE}...")
-try:
-    with open(LOG_FILE, "r") as f:
-        for line in follow(f):
-            score = check_log(line)
-            if score > THRESHOLD:
-                print(f"THREAT DETECTED [Score: {score:.2f}]: {line.strip()}")
-            else:
-                print(f"[Safe: {score:.2f}]", end="\r")
-except FileNotFoundError:
-    print(f"Make sure {LOG_FILE} exists!")
+def format_decision(decision: Decision, line: str) -> str:
+    limit = "-" if decision.repeat_limit is None else str(decision.repeat_limit)
+    detail = f"nll={decision.nll:.2f}  repeats={decision.repeats}  limit={limit}"
+    if decision.brute_alert and decision.perplexity_alert:
+        label = "BRUTE+NOVEL"
+    elif decision.brute_alert:
+        label = "BRUTE FORCE"
+    elif decision.perplexity_alert:
+        label = "NOVEL"
+    else:
+        label = "ok"
+    ip = f"  ip={decision.ip}" if decision.alert and decision.ip else ""
+    return f"[{label:<11}] {detail}{ip} | {line.strip()}"
+
+
+def follow(path):
+    with path.open("r", encoding="utf-8") as handle:
+        handle.seek(0, 2)
+        while True:
+            line = handle.readline()
+            if line:
+                yield line
+                continue
+            time.sleep(0.2)
+
+
+def main() -> None:
+    quiet_loggers()
+    require_training()
+    LOG_FILE.touch(exist_ok=True)
+    thresholds = load_thresholds()
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+    model = AutoModelForMaskedLM.from_pretrained(MODEL_DIR)
+    model.eval()
+    scorer = PseudoPerplexity(model, tokenizer)
+    miner = build_miner(load_existing=True)
+    window = RepeatWindow(int(thresholds["window_seconds"]))
+
+    print(f"Watching {LOG_FILE.name}")
+    print(
+        f"Novel template when mean NLL >= {thresholds['nll_threshold']:.2f}. "
+        f"Brute force when one IP repeats a known template "
+        f"{thresholds['repeat_margin']} above its normal peak inside "
+        f"{thresholds['window_seconds']}s."
+    )
+    print("Start attack_simulator.py in another terminal. Ctrl+C stops this watcher.")
+    try:
+        for line in follow(LOG_FILE):
+            if not line.strip():
+                continue
+            decision = decide(miner, scorer, window, thresholds, line, parse_timestamp(line))
+            print(format_decision(decision, line), flush=True)
+    except KeyboardInterrupt:
+        print("\nStopped.")
+
+
+if __name__ == "__main__":
+    main()

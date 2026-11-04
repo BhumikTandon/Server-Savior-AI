@@ -1,0 +1,61 @@
+{
+  "normal_lines": 90,
+  "normal_false_alarms": 0,
+  "isolated_failures": 12,
+  "isolated_false_alarms": 0,
+  "brute_episodes": 8,
+  "brute_episodes_detected": 8,
+  "novel_lines": 8,
+  "novel_detected": 8,
+  "near_variant_lines": 4,
+  "near_variant_detected": 0,
+  "nll_threshold": 0.5352950766682625,
+  "mean_nll_by_kind": {
+    "normal": 0.012040339425827067,
+    "isolated_fail": 0.03529507666826248,
+    "brute": 0.03529507666826248,
+    "novel": 6.4133301973342896,
+    "near_variant": 0.10030779987573624
+  },
+  "failed_password_alert_at": 5,
+  "window_seconds": 60,
+  "parameter_count": 8981562,
+  "examples": [
+    {
+      "kind": "isolated_fail",
+      "nll": 0.035,
+      "repeats": 1,
+      "repeat_limit": 5,
+      "perplexity_alert": false,
+      "brute_alert": false,
+      "line": "2026-12-01 09:04:24 sshd[3000]: Failed password for root from 198.51.100.1 port 22"
+    },
+    {
+      "kind": "brute",
+      "nll": 0.035,
+      "repeats": 5,
+      "repeat_limit": 5,
+      "perplexity_alert": false,
+      "brute_alert": true,
+      "line": "2026-12-01 09:23:57 sshd[7004]: Failed password for root from 203.0.113.20 port 22"
+    },
+    {
+      "kind": "novel",
+      "nll": 3.276,
+      "repeats": 1,
+      "repeat_limit": null,
+      "perplexity_alert": true,
+      "brute_alert": false,
+      "line": "2026-12-01 09:41:24 sshd[8000]: Invalid user oracle from 203.0.113.40 port 22"
+    },
+    {
+      "kind": "near_variant",
+      "nll": 0.1,
+      "repeats": 1,
+      "repeat_limit": null,
+      "perplexity_alert": false,
+      "brute_alert": false,
+      "line": "2026-12-01 09:44:44 sshd[9000]: Failed publickey for root from 198.51.100.40 port 22"
+    }
+  ]
+}

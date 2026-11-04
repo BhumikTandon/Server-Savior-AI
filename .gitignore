@@ -1,6 +1,6 @@
-savior_brain/
-checkpoints/
-__pycache__/
 .venv/
-*.txt
+__pycache__/
 .DS_Store
+artifacts/
+checkpoints/
+server_activity_logs.txt
